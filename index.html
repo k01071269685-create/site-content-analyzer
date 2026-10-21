@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>통합 사이트·이미지 분석기</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:#1d2736;background:#f4f6fa}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:30px 16px 60px}
+.hero{background:#211b3b;color:#fff;padding:28px;border-radius:18px}h1{margin:0 0 8px;font-size:clamp(25px,4vw,35px)}.hero p{margin:0;color:#e1ddf3;line-height:1.6}
+.panel{background:#fff;margin-top:18px;padding:22px;border-radius:16px;box-shadow:0 5px 20px #18213b0b}label{display:block;font-weight:700;margin:14px 0 7px}
+input,select{box-sizing:border-box;width:100%;padding:12px;border:1px solid #ccd4e1;border-radius:10px;font-size:16px;background:#fff}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+button{margin-top:18px;padding:13px 18px;background:#6941c6;color:white;border:0;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}button:disabled{opacity:.5}
+.hint{font-size:13px;color:#687589;line-height:1.6}#status{margin-top:14px;font-weight:600;overflow-wrap:anywhere}.check{display:flex;align-items:center;gap:9px;margin-top:12px}.check input{width:auto}.check label{display:inline;margin:0;font-weight:500}
+.result{padding:18px 0;border-top:1px solid #e7ebf1}.result:first-child{border-top:0}.result h3{margin:0 0 7px;font-size:19px}.result h3 a{color:#4a2c91;text-decoration:none}
+.meta{font-size:12px;color:#64748b;margin-bottom:7px;overflow-wrap:anywhere}.snippet{line-height:1.6;color:#344054}.gallery{display:flex;gap:10px;overflow-x:auto;padding:8px 0}
+.gallery figure{margin:0;min-width:145px;width:145px}.gallery img{width:145px;height:120px;object-fit:cover;border-radius:9px;background:#edf1f6}.gallery figcaption{font-size:11px;color:#667085;overflow-wrap:anywhere;margin-top:4px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.tag{font-size:12px;background:#f0eaff;color:#5932a5;border-radius:20px;padding:4px 8px}.empty{color:#687589;padding:20px 0}
+.dictionary{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.dictionary span{font-size:12px;background:#f2f4f7;padding:5px 8px;border-radius:16px}.warning{padding:10px 12px;border-radius:9px;background:#fff7e6;color:#7a4b00;font-size:13px;line-height:1.6}
+@media(max-width:600px){.row{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<section class="hero"><h1>통합 사이트·이미지 분석기</h1><p>입력한 사이트 내부의 게시물을 수집하고, K-pop 여성 아이돌 키워드·이미지 속 글자(OCR)·AI 이미지 맥락을 종합해 관련 게시물을 정렬합니다.</p></section>
+<section class="panel"><form id="form">
+<label for="url">분석할 사이트 주소</label><input id="url" type="url" placeholder="https://example.com" required>
+<div class="row"><div><label for="keywords">추가 키워드 (선택)</label><input id="keywords" placeholder="예: 장원영, IVE, 공항패션"><div class="hint">쉼표로 구분하세요. 내장 사전에 추가해 탐지합니다.</div></div>
+<div><label for="sort">정렬 방식</label><select id="sort"><option value="relevance">연관도 높은 순 → 최신순</option><option value="latest">최신순</option></select><div class="hint">연관도는 텍스트 일치, 이미지 OCR, AI의 일반적 시각 맥락 점수를 결합한 추정치입니다.</div></div></div>
+<div class="check"><input id="ocr" type="checkbox" checked><label for="ocr">이미지 속 글자 OCR 분석</label></div>
+<div class="check"><input id="vision" type="checkbox" checked><label for="vision">AI 이미지 맥락 분석</label></div>
+<div class="hint">AI 이미지 분석을 사용하려면 서버에 OPENAI_API_KEY를 설정해야 합니다. 얼굴을 이용해 특정 인물의 신원을 식별하지는 않습니다.</div>
+<button id="submit" type="submit">통합 분석 시작</button></form>
+<div id="status" role="status"></div>
+</section>
+<section class="panel"><h2>분석 결과 <span id="count"></span></h2>
+<div class="hint">Google 검색 결과를 직접 수집하지 않고, 입력한 사이트 내부의 공개 페이지를 분석합니다. 사이트 정책과 접근 제한에 따라 일부 페이지가 누락될 수 있습니다.</div>
+<div id="results" class="empty">사이트 주소를 입력하고 분석을 시작하세요.</div></section>
+<section class="panel"><h3>내장 탐지 사전</h3><div class="hint">대표적인 K-pop 여성 아이돌 및 그룹 이름입니다. app.py의 KPOP_WOMEN_IDOLS 목록에서 수정할 수 있습니다.</div><div class="dictionary">{% for idol in idols %}<span>{{ idol }}</span>{% endfor %}</div></section>
+</div>
+<script>
+const form=document.getElementById('form'),statusBox=document.getElementById('status'),resultsBox=document.getElementById('results'),countBox=document.getElementById('count'),submit=document.getElementById('submit');
+function el(tag,cls,text){const x=document.createElement(tag);if(cls)x.className=cls;if(text!==undefined)x.textContent=text;return x}
+function dateText(v){if(!v)return '게시 날짜 확인 불가';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString('ko-KR')}
+function render(items){resultsBox.replaceChildren();if(!items.length){resultsBox.className='empty';resultsBox.textContent='내장 사전, 추가 키워드 또는 이미지 맥락과 관련된 게시물을 찾지 못했습니다. 주소와 분석 설정을 확인해 주세요.';return}resultsBox.className='';
+items.forEach(item=>{const row=el('article','result'),h=el('h3'),a=el('a','',item.title||item.url);a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';h.appendChild(a);row.appendChild(h);
+row.appendChild(el('div','meta',dateText(item.date)+' · 통합 연관도 '+item.relevance_score));row.appendChild(el('div','meta',item.url));row.appendChild(el('div','snippet',item.snippet||'본문 요약 없음'));
+row.appendChild(el('div','meta','텍스트 점수: '+item.text_relevance+' · 이미지 OCR 점수: '+item.image_text_relevance+' · AI 시각 관련성: '+(item.max_vision_relevance===null?'분석되지 않음':item.max_vision_relevance)));
+if(item.detected_names?.length){const tags=el('div','tags');item.detected_names.forEach(k=>tags.appendChild(el('span','tag',k)));row.appendChild(tags)}
+if(item.images?.length){const gallery=el('div','gallery');item.images.forEach(im=>{const fig=el('figure'),img=el('img');img.src=im.url;img.alt=im.alt||'페이지 이미지';img.loading='lazy';img.onerror=()=>fig.remove();fig.appendChild(img);
+let caption=im.alt||im.filename||'이미지';if(im.ocr_text)caption+=' · OCR: '+im.ocr_text.slice(0,70);if(im.vision?.category)caption+=' · 유형: '+im.vision.category;if(im.vision?.description)caption+=' · '+im.vision.description.slice(0,80);fig.appendChild(el('figcaption','',caption));gallery.appendChild(fig)});row.appendChild(gallery)}
+if(item.vision_enabled && item.images?.some(im=>im.vision?.status==='not_configured'))row.appendChild(el('div','warning','AI 이미지 분석이 요청되었지만 OPENAI_API_KEY가 설정되지 않았습니다. OCR과 텍스트 분석은 계속 작동합니다.'));
+resultsBox.appendChild(row)})}
+form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;statusBox.textContent='사이트 페이지와 이미지들을 분석하는 중입니다. 이미지 수와 OCR/AI 설정에 따라 시간이 걸릴 수 있습니다.';resultsBox.replaceChildren();countBox.textContent='';
+try{const r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:document.getElementById('url').value.trim(),keywords:document.getElementById('keywords').value,sort:document.getElementById('sort').value,ocr:document.getElementById('ocr').checked,vision:document.getElementById('vision').checked})});const data=await r.json();if(!r.ok)throw new Error(data.error||'분석에 실패했습니다.');countBox.textContent='('+data.count+'개)';statusBox.textContent='분석 완료 · '+data.site+' · '+data.notice;render(data.results||[])}
+catch(err){statusBox.textContent=err.message;resultsBox.className='empty';resultsBox.textContent='주소, 사이트 접근 권한 및 자동 수집 정책을 확인해 주세요.'}finally{submit.disabled=false}});
+</script></body></html>
